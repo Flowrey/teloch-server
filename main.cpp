@@ -33,8 +33,8 @@ int main()
     struct addrinfo* result = NULL, * ptr = NULL, hints;
     ZeroMemory(&hints, sizeof(hints));
     hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
+    hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_protocol = IPPROTO_UDP;
     hints.ai_flags = AI_PASSIVE;
 
     // Resolve the local address and port to be used by the server
@@ -67,14 +67,6 @@ int main()
         return 1;
     }
 
-    if (listen(ListenSocket, SOMAXCONN) == SOCKET_ERROR) {
-        std::cout << "Listen failed with error: " << WSAGetLastError() << std::endl;
-        closesocket(ListenSocket);
-        WSACleanup();
-        return 1;
-    }
-
-
     // Initialisation de la bibliothèque COM
     HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
 
@@ -97,38 +89,11 @@ int main()
     pDevice->Activate(IID_IAudioEndpointVolume, CLSCTX_ALL, NULL, (void**)&pAudioEndpointVolume);
 
     while (true) {
-        // Accept a client socket
-        SOCKET ClientSocket = INVALID_SOCKET;
-        std::cout << "Waiting for a client socket..." << std::endl;
-
-        ClientSocket = accept(ListenSocket, NULL, NULL);
-        if (ClientSocket == INVALID_SOCKET) {
-            std::cout << "accept failed: " << WSAGetLastError() << std::endl;
-            closesocket(ListenSocket);
-            WSACleanup();
-            return 1;
-        }
-        std::cout << "accept succeeded" << std::endl;
-
         float volume = 0.0;
-        // Receive until the peer shuts down the connection
-        do {
-            iResult = recv(ClientSocket, (char*)&volume, sizeof(volume), 0);
-            if (iResult > 0) {
-                // printf("Bytes received: %d\n", iResult);
-                printf("Setting volume to: %f\n", volume);
-                // Changement du volume
-                pAudioEndpointVolume->SetMasterVolumeLevelScalar(volume, NULL);
-            }
-            else if (iResult == 0) {
-                printf("Connection closing...\n");
-            }
-            else {
-                printf("recv failed: %d\n", WSAGetLastError());
-                closesocket(ClientSocket);
-            }
-
-        } while (iResult > 0);
+        recvfrom(ListenSocket, (char*)&volume, sizeof(volume), 0, NULL, NULL);
+        printf("Setting volume to: %f\n", volume);
+        // Changement du volume
+        pAudioEndpointVolume->SetMasterVolumeLevelScalar(volume, NULL);
     }
 
     // Clean
